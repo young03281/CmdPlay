@@ -19,16 +19,10 @@ namespace CmdPlay
     {
 
         const string brightnessLevels0 = " .-+*wGHM#&%@";
-
-        private static readonly object Lock = new();
-        private static readonly object LockBytes = new();
-
         static char[] GetCharArray(char[,] twoDArray, int a)
         {
-            // Create a new array to store the first array (first row)
             char[] firstArray = new char[twoDArray.GetLength(1)];
 
-            // Copy the elements of the first row to the new array
             for (int i = 0; i < twoDArray.GetLength(1); i++)
             {
                 firstArray[i] = twoDArray[a, i];
@@ -50,32 +44,6 @@ namespace CmdPlay
                 str[i] = new string(GetCharArray(chars, i));
             });
             return str;
-        }
-        static int[,] GetInt2dArray(int[,,] threeDArray, int a)
-        {
-            // Create a new array to store the first array (first row)
-            int[,] firstArray = new int[threeDArray.GetLength(1), threeDArray.GetLength(2)];
-
-            // Copy the elements of the first row to the new array
-            for (int i = 0; i < threeDArray.GetLength(1); i++)
-            {
-                for (int j = 0; j < threeDArray.GetLength(2); j++)
-                {
-                    firstArray[i, j] = threeDArray[a - 1, i, j];
-                }
-            }
-
-            return firstArray;
-        }
-        public static byte[] GetBytes(byte[,] bytes, int a)
-        {
-            byte[] arr = new byte[bytes.GetLength(1)];
-
-            for (int i = 0; i < bytes.GetLength(1); i++)
-            {
-                arr[i] = bytes[a, i];
-            }
-            return arr;
         }
         static void Kernel(Index3D i, ArrayView3D<int, Stride3D.DenseXY> dIndex, int w, ArrayView2D<byte, Stride2D.DenseY> framebuilder, ArrayView2D<byte, Stride2D.DenseY> bytes)
         {
@@ -119,43 +87,16 @@ namespace CmdPlay
             }
             framebuilder[i.Z, i.X + i.Y * (w + 1)] = (byte)brightnessstr[dIndex[i.Z, i.Y, i.X]*2];
         }
-        /*
-        struct FrameBytes
-        {
-            public byte[,] bytesarr { get; set; }
-            public byte[] bytes { get; set; }
-            public FrameBytes(int a, int b)
-            {
-                bytesarr = new byte[a, b];
-                bytes = new byte[b];
-            }
-            public void SetBytesToArr(int a)
-            {
-                for (int i = 0; i < bytes.Length; i++)
-                {
-                    bytesarr[a, i] = bytes[i];
-                }
-            }
-            public byte[] GetBytesFromArr(int a)
-            {
-                return GetBytes(bytesarr, a);
-            }
-        }*/
         static void Main(string[] args)
         {
 
             string inputFilename;
-            /*Context context = Context.Create(builder => builder.Cuda());
-            Accelerator accelerator = context.GetPreferredDevice(false).CreateAccelerator(context);*/
             Context context = Context.Create(builder => builder.Cuda());
             Accelerator accelerator = context.GetPreferredDevice(false).CreateAccelerator(context);
 
             Console.WriteLine("Remember, Window size will affect the resolution of the video!!");
             Console.WriteLine("Choose if you are using high or low resolution, 1. low(suggested)  2.high:");
             Console.WriteLine("This is a gpu version for the program, you cant choose the high version!");
-
-            //int choose = int.Parse(Console.ReadLine());
-            //int choose = 1;
 
 
             if (args.Length == 0)
@@ -273,9 +214,6 @@ namespace CmdPlay
                     frameBuilder[a, i] = (byte)' ';
                 }
             }
-            //int frameIndex = 1;
-            //int percentage;
-            //FrameBytes frameBytes = new FrameBytes(frameCount, Encoding.ASCII.GetBytes(GetCharArray(frameBuilder, 1)).Length);
             int[,,] dIndex = new int[frameCount, targetFrameHeight, targetFrameWidth];
 
             Parallel.For(0, frameCount, a =>
