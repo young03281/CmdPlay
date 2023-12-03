@@ -1,4 +1,6 @@
 ﻿using FFMpegCore;
+using ILGPU;
+using ILGPU.Runtime;
 using NAudio.Wave;
 using System;
 using System.Collections.Generic;
@@ -7,8 +9,6 @@ using System.Drawing;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
-using Task = System.Threading.Tasks.Task;
-
 namespace CmdPlay
 {
 
@@ -18,40 +18,134 @@ namespace CmdPlay
     {
 
         const string brightnessLevels0 = " .-+*wGHM#&%@";
-        const string brightnessLevels1 = "          `.-':_,^=;><+!rc*/z?sLTv)J7(|F{C}fI31tlu[neoZ5Yxya]2ESwqkP6h9d4VpOGbUAKXHm8RD#$Bg0MNWQ%&@██████████████";
 
-        private static readonly object Lock = new object();
+        private static readonly object Lock = new();
+        private static readonly object LockBytes = new();
 
+        static char[] GetCharArray(char[,] twoDArray, int a)
+        {
+            // Create a new array to store the first array (first row)
+            char[] firstArray = new char[twoDArray.GetLength(1)];
+
+            // Copy the elements of the first row to the new array
+            for (int i = 0; i < twoDArray.GetLength(1); i++)
+            {
+                firstArray[i] = twoDArray[a, i];
+            }
+
+            return firstArray;
+        }
+        static string[] Get2DCharsToString(byte[,] bytes)
+        {
+            char[,] chars = new char[bytes.GetLength(0), bytes.GetLength(1)];
+            string[] str = new string[bytes.GetLength(0)];
+            Parallel.For (0, bytes.GetLength(0), i => {
+
+                Parallel.For(0, bytes.GetLength(1), j => {
+                    chars[i, j] = (char)bytes[i, j];
+                });
+                str[i] = new string(GetCharArray(chars, i));
+            });
+            return str;
+        }
+        static int[,] GetInt2dArray(int[,,] threeDArray, int a)
+        {
+            // Create a new array to store the first array (first row)
+            int[,] firstArray = new int[threeDArray.GetLength(1), threeDArray.GetLength(2)];
+
+            // Copy the elements of the first row to the new array
+            for (int i = 0; i < threeDArray.GetLength(1); i++)
+            {
+                for (int j = 0; j < threeDArray.GetLength(2); j++)
+                {
+                    firstArray[i, j] = threeDArray[a-1, i, j];
+                }
+            }
+
+            return firstArray;
+        }
+        public static byte[] GetBytes(byte[,] bytes, int a)
+        {
+            byte[] arr = new byte[bytes.GetLength(1)];
+
+            for (int i = 0; i < bytes.GetLength(1); i++)
+            {
+                arr[i] = bytes[a, i];
+            }
+            return arr;
+        }
+        static void Kernel(Index3D i, ArrayView3D<int, Stride3D.DenseXY> dIndex, int w, ArrayView2D<byte, Stride2D.DenseY> framebuilder)
+        {
+            char[] brightness;
+            brightness = new char[] { ' ', '.', '-', '+', '*', 'w', 'G', 'H', 'M', '#', '&', '%', '@' };
+            if (i.X + 1 == w)
+            {
+                framebuilder[i.Z, w * (i.Y + 1) + i.Y] = (byte)'\n';
+            }
+            if (dIndex[i.Z, i.Y, i.X] < 0)
+            {
+                dIndex[i.Z, i.Y, i.X] = 0;
+            }
+            else if (dIndex[i.Z, i.Y, i.X] >= brightness.Length)
+            {
+                dIndex[i.Z, i.Y, i.X] = brightness.Length - 1;
+            }
+            framebuilder[i.Z, i.X + i.Y * (w + 1)] = (byte)brightness[dIndex[i.Z, i.Y, i.X] * 2];
+        }
+        /*
+        struct FrameBytes
+        {
+            public byte[,] bytesarr { get; set; }
+            public byte[] bytes { get; set; }
+            public FrameBytes(int a, int b)
+            {
+                bytesarr = new byte[a, b];
+                bytes = new byte[b];
+            }
+            public void SetBytesToArr(int a)
+            {
+                for (int i = 0; i < bytes.Length; i++)
+                {
+                    bytesarr[a, i] = bytes[i];
+                }
+            }
+            public byte[] GetBytesFromArr(int a)
+            {
+                return GetBytes(bytesarr, a);
+            }
+        }*/
         static void Main(string[] args)
         {
 
-        string inputFilename;
+            string inputFilename;
+            /*Context context = Context.Create(builder => builder.Cuda());
+            Accelerator accelerator = context.GetPreferredDevice(false).CreateAccelerator(context);*/
+            Context context = Context.CreateDefault();
+            Accelerator accelerator = context.GetPreferredDevice(false).CreateAccelerator(context);
 
             Console.WriteLine("Remember, Window size will affect the resolution of the video!!");
-            Console.Write("Choose if you are using high or low resolution, 1. low(suggested)  2.high:");
+            Console.WriteLine("Choose if you are using high or low resolution, 1. low(suggested)  2.high:");
+            Console.WriteLine("This is a gpu version for the program, you cant choose the high version!");
 
-            int choose = int.Parse(Console.ReadLine());
+            //int choose = int.Parse(Console.ReadLine());
+            int choose = 1;
             string brightnessLevels = brightnessLevels0;
-
-            if (choose == 2)
-            {
-                brightnessLevels = brightnessLevels1;
-            }
 
 
             if (args.Length == 0)
             {
                 Console.Write("Input File \"Path\" or name if its in the folder(you also have to write the extension down):");
-                inputFilename = Console.ReadLine().Replace("\"", "");
+                //inputFilename = Console.ReadLine().Replace("\"", "");
+                inputFilename = "D:\\B.mp4";
             }
             else
             {
                 inputFilename = args[0];
             }
 
-            FileInfo file = new FileInfo(Path.GetFullPath(inputFilename));
+            FileInfo file = new(Path.GetFullPath(inputFilename));
 
-            FFOptions options = new FFOptions();
+            FFOptions options = new();
             options.BinaryFolder = Path.GetDirectoryName("ffprobe.exe");
 
             var matadata = FFProbe.AnalyseAsync(file.FullName, options).Result;
@@ -111,10 +205,8 @@ namespace CmdPlay
                 Directory.CreateDirectory("tmp\\frames\\");
             }
 
-
-
             Console.WriteLine("[INFO] Step 2 / 4: Extracting frames...");
-            Process ffmpegProcess = new Process(); /* Launch ffmpeg process to extract the frames */
+            Process ffmpegProcess = new(); /* Launch ffmpeg process to extract the frames */
             ffmpegProcess.StartInfo.FileName = "ffmpeg.exe";
             ffmpegProcess.StartInfo.Arguments = "-i \"" + inputFilename + "\" -vf scale=" +
                                     targetFrameWidth + ":" + targetFrameHeight + " tmp\\frames\\%0d.bmp";
@@ -140,28 +232,34 @@ namespace CmdPlay
             int frameCount = Directory.GetFiles("tmp\\frames", "*.bmp").Length;
 
             Bitmap[] b = new Bitmap[frameCount];
+            Bitmap aa = new Bitmap("tmp\\frames\\" + 1 + ".bmp");
+            int H = aa.Height;
+            int W = aa.Width;
             string[] filename = new string[frameCount];
-            List<string> frames = new List<string>();
-            StringBuilder[] frameBuilder = new StringBuilder[frameCount];
+            string[] frames = new string[frameCount];
+            byte[,] frameBuilder = new byte[frameCount, (H * W + H)];
             for (int a = 0; a < frameCount; a++)
             {
-                frames.Add("");
-                frameBuilder[a] = new StringBuilder("");
+                frames[a] = "";
+                for (int i = 0; i < H * W + H; i++)
+                {
+                    frameBuilder[a, i] = (byte)' ';
+                }
             }
-            int frameIndex = 1;
-            int percentage;
+            //int frameIndex = 1;
+            //int percentage;
+            //FrameBytes frameBytes = new FrameBytes(frameCount, Encoding.ASCII.GetBytes(GetCharArray(frameBuilder, 1)).Length);
             int[,,] dIndex = new int[frameCount, targetFrameHeight, targetFrameWidth];
+
+            Console.WriteLine(GetBytes(frameBuilder, 0).Length);
 
             Parallel.For(0, frameCount, a =>
             {
+
                 filename[a] = "tmp\\frames\\" + (a + 1).ToString() + ".bmp";
                 b[a] = new Bitmap(filename[a]);
-                int H = b[a].Height;
-                int W = b[a].Width;
-                for (int i = 0; i < H * W + H; i++)
-                {
-                    frameBuilder[a].Append('x');
-                }
+                H = b[a].Height;
+                W = b[a].Width;
                 for (int y = 0; y < H; y++)
                 {
                     for (int x = 0; x < W; x++)
@@ -169,45 +267,32 @@ namespace CmdPlay
                         dIndex[a, y, x] = (int)(b[a].GetPixel(x, y).GetBrightness() * brightnessLevels.Length);
                     }
                 }
-                Task height = Task.Run(() =>
-                {
-                    Parallel.For(0, H, y =>
-                    {
-                        Task width = Task.Run(() =>
-                        {
-                            Parallel.For(0, W, x =>
-                            {
-                                if (dIndex[a, y, x] < 0)
-                                {
-                                    dIndex[a, y, x] = 0;
-                                }
-                                else if (dIndex[a, y, x] >= brightnessLevels.Length)
-                                {
-                                    dIndex[a, y, x] = brightnessLevels.Length - 1;
-                                }
-                                frameBuilder[a].Replace('x', brightnessLevels[dIndex[a, y, x]], x + y * (W + 1), 1);
-                            });
-                        });
-                        width.Wait();
-                        frameBuilder[a].Replace('x', '\n', W * (y + 1) + y, 1);
-                    });
-                });
-                height.Wait();
-                frames[a] = frameBuilder[a].ToString();
-
-                lock (Lock)
-                {
-                    frameIndex++;
-                    percentage = (int)(frameIndex / (float)frameCount * 100);
-                    Console.SetCursorPosition(15, currentCursorHeight);
-                    Console.Write(percentage.ToString());
-                    Console.SetCursorPosition(21 + percentage / 5, currentCursorHeight);
-                    if (percentage % 5 == 0 && percentage != 0)
-                    {
-                        Console.Write("#");
-                    }
-                }
             });
+            MemoryBuffer3D<int, Stride3D.DenseXY> d_Index = accelerator.Allocate3DDenseXY(dIndex);
+            MemoryBuffer2D<byte, Stride2D.DenseY> d_framebuilder = accelerator.Allocate2DDenseY(frameBuilder);
+
+
+            Action<Index3D, ArrayView3D<int, Stride3D.DenseXY>, int, ArrayView2D<byte, Stride2D.DenseY>> loadedKernel =
+            accelerator.LoadAutoGroupedStreamKernel<Index3D, ArrayView3D<int, Stride3D.DenseXY>, int, ArrayView2D<byte, Stride2D.DenseY>>(Kernel);
+
+            Index3D index3D = new Index3D(W, H, frameCount);
+
+            loadedKernel(index3D, d_Index.View, W, d_framebuilder.View);
+            accelerator.Synchronize();
+
+
+            frames = Get2DCharsToString(d_framebuilder.GetAsArray2D());
+
+            /*
+            frameIndex++;
+            percentage = (int)(frameIndex / (float)frameCount * 100);
+            Console.SetCursorPosition(15, currentCursorHeight);
+            Console.Write(percentage.ToString());
+            Console.SetCursorPosition(21 + percentage / 5, currentCursorHeight);
+            if (percentage % 5 == 0 && percentage != 0)
+            {
+                Console.Write("#");
+            }*/
 
 
             AudioFileReader reader = new AudioFileReader("tmp\\audio.wav");
@@ -222,7 +307,7 @@ namespace CmdPlay
             {
                 float Fpercentage = woe.GetPosition() / (float)reader.Length;
                 int frame = (int)(Fpercentage * frameCount);
-                if (frame >= frames.Count)
+                if (frame >= frames.Length)
                     break;
 
                 Console.SetCursorPosition(0, 0);
@@ -254,5 +339,6 @@ namespace CmdPlay
             Console.WriteLine("Done. Press any key to close");
             Console.ReadKey();
         }
+
     }
 }
