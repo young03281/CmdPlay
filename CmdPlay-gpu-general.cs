@@ -16,7 +16,7 @@ using ILGPU.Runtime.Cuda;
 
 namespace CmdPlay
 {
-    class CmdPlay_ge
+    public class CmdPlay_ge
     {
 
         const string brightnessLevels0 = " .-+*wGHM#&%@";
@@ -88,7 +88,7 @@ namespace CmdPlay
             }
             framebuilder[i.Z, i.X + i.Y * (w + 1)] = (byte)brightnessstr[dIndex[i.Z, i.Y, i.X] * 2];
         }
-        static void Main(string[] args)
+        public static void Main_general(string[] args)
         {
 
             string inputFilename;

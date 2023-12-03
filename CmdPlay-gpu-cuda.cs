@@ -15,7 +15,7 @@ namespace CmdPlay
 
 
 
-    class CmdPlay
+    public class CmdPlay
     {
 
         const string brightnessLevels0 = " .-+*wGHM#&%@";
@@ -47,9 +47,9 @@ namespace CmdPlay
         }
         static void Kernel(Index3D i, ArrayView3D<int, Stride3D.DenseXY> dIndex, int w, ArrayView2D<byte, Stride2D.DenseY> framebuilder, ArrayView2D<byte, Stride2D.DenseY> bytes)
         {
-            float R = (float)(int)bytes[i.Z, (i.Y * (w) + i.X) *4]/255f;
-            float G = (float)(int)bytes[i.Z, (i.Y * (w) + i.X)*4 + 1]/255f;
-            float B = (float)(int)bytes[i.Z, (i.Y * (w) + i.X) * 4 + 2]/255f;
+            float R = (float)(int)bytes[i.Z, (i.Y * (w) + i.X) * 4] / 255f;
+            float G = (float)(int)bytes[i.Z, (i.Y * (w) + i.X) * 4 + 1] / 255f;
+            float B = (float)(int)bytes[i.Z, (i.Y * (w) + i.X) * 4 + 2] / 255f;
             float num4 = R;
             float num5 = R;
             char[] brightnessstr;
@@ -71,7 +71,7 @@ namespace CmdPlay
                 num5 = B;
             }
             float brightnessLevel = (num4 + num5) / 2f;
-            dIndex[i.Z, i.Y, i.X] = (int)(brightnessLevel * brightnessstr.Length*2);
+            dIndex[i.Z, i.Y, i.X] = (int)(brightnessLevel * brightnessstr.Length * 2);
 
             if (i.X + 1 == w)
             {
@@ -85,9 +85,9 @@ namespace CmdPlay
             {
                 dIndex[i.Z, i.Y, i.X] = brightnessstr.Length - 1;
             }
-            framebuilder[i.Z, i.X + i.Y * (w + 1)] = (byte)brightnessstr[dIndex[i.Z, i.Y, i.X]*2];
+            framebuilder[i.Z, i.X + i.Y * (w + 1)] = (byte)brightnessstr[dIndex[i.Z, i.Y, i.X] * 2];
         }
-        static void Main(string[] args)
+        public static void Main_cuda(string[] args)
         {
 
             string inputFilename;
@@ -197,56 +197,52 @@ namespace CmdPlay
 
             int frameCount = Directory.GetFiles("tmp\\frames", "*.bmp").Length;
 
-            Bitmap[] b = new Bitmap[frameCount];
             Bitmap aa = new Bitmap("tmp\\frames\\" + 1 + ".bmp");
             int H = aa.Height;
             int W = aa.Width;
-            string[] filename = new string[frameCount];
             string[] frames = new string[frameCount];
-            byte[,] frameBuilder = new byte[frameCount, (H * W + H)];
             BitmapData[] bitmapData = new BitmapData[frameCount];
             byte[,] bitmapbytes = new byte[frameCount, H * W * 4];
-            for (int a = 0; a < frameCount; a++)
-            {
-                frames[a] = "";
-                for (int i = 0; i < H * W + H; i++)
-                {
-                    frameBuilder[a, i] = (byte)' ';
-                }
-            }
-            int[,,] dIndex = new int[frameCount, targetFrameHeight, targetFrameWidth];
+            Rectangle rect = new Rectangle(0, 0, W, H);
 
             Parallel.For(0, frameCount, a =>
             {
 
-                filename[a] = "tmp\\frames\\" + (a + 1).ToString() + ".bmp";
-                b[a] = new Bitmap(filename[a]);
-                Rectangle rect = new Rectangle(0, 0, b[a].Width, b[a].Height);
-                bitmapData[a] = b[a].LockBits(rect, ImageLockMode.ReadWrite, PixelFormat.Format32bppRgb);
-                int size = bitmapData[a].Width * bitmapData[a].Height * 4;
+                bitmapData[a] = new Bitmap("tmp\\frames\\" + (a + 1).ToString() + ".bmp").LockBits(rect, ImageLockMode.ReadWrite, PixelFormat.Format32bppRgb);
+                int size = W * H * 4;
                 byte[] bitmapbyte = new byte[size];
                 Marshal.Copy(bitmapData[a].Scan0, bitmapbyte, 0, size);
                 Parallel.For(0, size, b =>
                 {
                     bitmapbytes[a, b] = bitmapbyte[b];
+                    bitmapbyte[b] = 0;
                 });
-                b[a].Dispose();
+                bitmapData[a] = null;
             });
+            bitmapData = null;
+            GC.Collect();
 
             Console.WriteLine("finish index");
-            MemoryBuffer3D<int, Stride3D.DenseXY> d_Index = accelerator.Allocate3DDenseXY(dIndex);
-            MemoryBuffer2D<byte, Stride2D.DenseY> d_framebuilder = accelerator.Allocate2DDenseY(frameBuilder);
+            MemoryBuffer3D<int, Stride3D.DenseXY> d_Index = accelerator.Allocate3DDenseXY(new int[frameCount, targetFrameHeight, targetFrameWidth]);
+            MemoryBuffer2D<byte, Stride2D.DenseY> d_framebuilder = accelerator.Allocate2DDenseY(new byte[frameCount, (H * W + H)]);
             MemoryBuffer2D<byte, Stride2D.DenseY> d_bitmapbyte = accelerator.Allocate2DDenseY(bitmapbytes);
+            bitmapbytes = null;
+            GC.Collect();
 
             Action<Index3D, ArrayView3D<int, Stride3D.DenseXY>, int, ArrayView2D<byte, Stride2D.DenseY>, ArrayView2D<byte, Stride2D.DenseY>> loadedKernel =
             accelerator.LoadAutoGroupedStreamKernel<Index3D, ArrayView3D<int, Stride3D.DenseXY>, int, ArrayView2D<byte, Stride2D.DenseY>, ArrayView2D<byte, Stride2D.DenseY>>(Kernel);
 
             loadedKernel((W, H, frameCount), d_Index.View, targetFrameWidth, d_framebuilder.View, d_bitmapbyte.View);
             accelerator.Synchronize();
+            d_Index.Dispose();
+            GC.Collect();
             Console.WriteLine("GPU finished");
             Console.WriteLine("converting bytes to char...");
 
             frames = Get2DCharsToString(d_framebuilder.GetAsArray2D());
+            d_framebuilder.Dispose();
+            d_bitmapbyte.Dispose();
+            GC.Collect();
             watch.Stop();
             var elapsedMs = watch.ElapsedMilliseconds;
             Console.WriteLine(elapsedMs.ToString());
@@ -267,6 +263,7 @@ namespace CmdPlay
 
                 Console.SetCursorPosition(0, 0);
                 Console.WriteLine(frames[frame]);
+
 
                 if (Console.KeyAvailable)
                 {
@@ -290,6 +287,7 @@ namespace CmdPlay
                             }
                     }
                 }
+                GC.Collect();
             }
             Console.WriteLine("Done. Press any key to close");
             Console.ReadKey();
