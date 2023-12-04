@@ -1,9 +1,6 @@
 # CmdPlay
 Lets you play videos in command line using ASCII-Art.
 
-This program uses ffmpeg for video decoding and NAudio for audio playback.
-Thus it needs a reference to NAudio and a copy of ffmpeg.exe in the working directory.
-
 Compiled binary for windows: https://github.com/young03281/CmdPlay-gpu/releases/tag/gpu-release1.0
 
 Demonstration video: https://www.youtube.com/watch?v=qvRKJj9CbxE
