@@ -6,7 +6,7 @@ Compiled binary for windows: https://github.com/young03281/CmdPlay-gpu/releases/
 Demonstration video: https://www.youtube.com/watch?v=qvRKJj9CbxE
 
 # Known issues / weaknesses
-No buffering, long load times
+Tell me if you find one
 
 # License
 The program code including all cs files and the CmdPlay binary are licensed under the MIT license. This does NOT apply to FFmpeg or NAudio.
