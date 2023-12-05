@@ -5,6 +5,9 @@ Compiled binary for windows: https://github.com/young03281/CmdPlay-gpu/releases/
 
 Demonstration video: https://www.youtube.com/watch?v=qvRKJj9CbxE
 
+you have to download all three exe to run cmdplay
+
+
 # Known issues / weaknesses
 Tell me if you find one
 
