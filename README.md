@@ -9,7 +9,7 @@ you have to download all three exe to run cmdplay
 
 
 # Known issues / weaknesses
-Tell me if you find one
+cant use high resolution if you're using high fps (120 or above), looking foward to change to streaming ver.
 
 # License
 The program code including all cs files and the CmdPlay binary are licensed under the MIT license. This does NOT apply to FFmpeg or NAudio.
