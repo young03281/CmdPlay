@@ -1,0 +1,10 @@
+﻿################################################################################
+# 這個 .gitignore 檔案由 Microsoft(R) Visual Studio 自動建立。
+################################################################################
+
+/Cmdplay-gpu/bin/Debug/tmp
+/Cmdplay-gpu/bin/x64/Debug
+/Cmdplay-gpu/bin/Debug
+/Cmdplay-gpu/obj/x64/Debug
+/Cmdplay-gpu/CmdPlay-gpu.cs
+*.vsidx

@@ -50,38 +50,16 @@ namespace CmdPlay
             float R = (float)(int)bytes[i.Z, (i.Y * (w) + i.X) * 4] / 255f;
             float G = (float)(int)bytes[i.Z, (i.Y * (w) + i.X) * 4 + 1] / 255f;
             float B = (float)(int)bytes[i.Z, (i.Y * (w) + i.X) * 4 + 2] / 255f;
-            float num4 = R;
-            float num5 = R;
             char[] brightnessstr;
             brightnessstr = new char[] { ' ', '.', '-', '+', '*', 'w', 'G', 'H', 'M', '#', '&', '%', '@' };
-            if (G > num4)
-            {
-                num4 = G;
-            }
-            if (B > num4)
-            {
-                num4 = B;
-            }
-            if (G < num5)
-            {
-                num5 = G;
-            }
-            if (B < num5)
-            {
-                num5 = B;
-            }
-            float brightnessLevel = (num4 + num5) / 2f;
+            float brightnessLevel = (float)(0.2126 * R + 0.7152 * G + 0.0722 * B);
             dIndex[i.Z, i.Y, i.X] = (int)(brightnessLevel * brightnessstr.Length * 2);
 
             if (i.X + 1 == w)
             {
                 framebuilder[i.Z, w * (i.Y + 1) + i.Y] = (byte)'\n';
             }
-            if (dIndex[i.Z, i.Y, i.X] < 0)
-            {
-                dIndex[i.Z, i.Y, i.X] = 0;
-            }
-            else if (dIndex[i.Z, i.Y, i.X] >= brightnessstr.Length)
+            if (dIndex[i.Z, i.Y, i.X] >= brightnessstr.Length)
             {
                 dIndex[i.Z, i.Y, i.X] = brightnessstr.Length - 1;
             }
